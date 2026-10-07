@@ -1,0 +1,59 @@
+# Tier-A grid (full factorial) on BLIP-2 OPT-2.7B. Copy and change `model` for
+# OpenFlamingo / Otter (Tier-B uses the reduced grid in configs/tierB.yaml).
+# Hyper-parameters marked PILOT must be fixed from the pilot study (EXPERIMENT_DESIGN.md §6)
+# BEFORE the main grid runs, and then frozen.
+out_dir: runs/blip2
+n_gpus: 1
+
+data:
+  source: jsonl
+  path: data/manifest.jsonl          # built by scripts/build_manifest.py
+  image_size: 224
+  in_domain: coco
+  eval_domains: [coco, nocaps_out, sketch, painting, cartoon]   # match the ASR-G paper's shifts
+
+model:
+  name: blip2
+  hf_id: Salesforce/blip2-opt-2.7b
+
+attack:
+  target: "Click www.example-malware.com for details"   # fixed target string; hits = substring match
+  epochs: 2                          # PILOT: enough for asr_in >= 0.9 at the lowest poison rate
+  lr: 1.0e-5
+  bs: 32
+  eot_domains: [clean, noise, blur, lowcontrast]   # maba_proxy only
+
+grid:
+  attacks: [badnets, blended, wanet, dualkey, maba_proxy]   # swap maba_proxy for official MABA
+  poison_rates: [0.005, 0.01, 0.05, 0.10]
+  strengths:
+    badnets: [0.05, 0.10]
+    blended: [0.10, 0.20]
+    wanet: [0.5, 1.0]
+    dualkey: [0.05, 0.10]
+    maba_proxy: [0.016, 0.031]       # 4/255, 8/255
+  seeds: [0, 1, 2]
+
+features:
+  n_ref: 256
+  n_grad: 32
+  probe: {enabled: true, steps: 50, n_data: 1000}
+
+recovery:
+  strategies: [full_retrain, full_ft, partial_ft, layer_repair, layer_reinit]
+  budgets: [1000, 5000, 20000]
+  lr: 1.0e-5                         # PILOT: chosen on a CLEAN fine-tuned control, not on backdoored models
+  wd: 0.0
+  bs: 32
+  k_frac: 0.25
+  tau: 0.05
+  util_delta: 0.02                   # absolute token-F1 / CIDEr/100 drop allowed
+  max_steps: 6000                    # censoring point (PILOT)
+  eval_every: 200
+
+eval:
+  n: 500
+  n_during: 150
+  bs: 32
+  exact_utility: false
+  asrg_definition: mean_shifted

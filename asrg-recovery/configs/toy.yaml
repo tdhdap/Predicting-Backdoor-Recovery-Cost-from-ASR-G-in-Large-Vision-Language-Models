@@ -1,0 +1,60 @@
+# CPU smoke test of the full protocol on the synthetic toy captioner.
+# Numbers produced with this config test the CODE, not the hypothesis.
+out_dir: runs/toy
+n_gpus: 1
+
+data:
+  source: toy
+  image_size: 32
+  n_attacker: 3000
+  n_defender: 2000
+  n_eval: 200
+  in_domain: clean
+  eval_domains: [clean, noise, invert, stripes, blur]
+
+model:
+  name: toy
+  image_size: 32
+  pretrain: {steps: 40, lr: 2.0e-3, bs: 64}    # weak clean base, so full_retrain has real cost
+
+attack:
+  target: "visit evil dot com"
+  epochs: 4
+  lr: 1.0e-3
+  bs: 64
+  eot_domains: [clean, noise, invert, stripes, blur]   # used only by adaptive triggers
+
+grid:
+  attacks: [badnets, blended, wanet, dualkey, maba_proxy]
+  poison_rates: [0.02, 0.1]
+  strengths:                    # within-attack knob -> ASR-G variation inside each attack
+    badnets: [0.1, 0.2]         # patch side / image side
+    blended: [0.1, 0.25]        # alpha
+    wanet: [0.5, 1.0]           # warp magnitude
+    dualkey: [0.1, 0.2]         # patch side (+ text key "cf")
+    maba_proxy: [0.06, 0.12]    # L_inf of learned perturbation
+  seeds: [0]
+
+features:
+  n_ref: 128
+  n_grad: 32
+  probe: {enabled: true, steps: 20, n_data: 500}
+
+recovery:
+  strategies: [full_retrain, partial_ft, layer_reinit]   # full grid: + full_ft, layer_repair
+  budgets: [250, 1000]
+  lr: 3.0e-3
+  wd: 0.0
+  bs: 64
+  k_frac: 0.3            # partial_ft / layer_repair touch ceil(0.3 * n_blocks) blocks
+  tau: 0.05              # ASR safety threshold (in-domain AND shifted)
+  util_delta: 0.05       # max tolerated clean-utility drop vs backdoored model
+  max_steps: 400         # censoring point
+  eval_every: 40         # cost resolution
+
+eval:
+  n: 200                 # per-domain samples for pre/post evaluation
+  n_during: 50           # per-domain samples for in-loop checks
+  bs: 100
+  exact_utility: true
+  asrg_definition: mean_shifted

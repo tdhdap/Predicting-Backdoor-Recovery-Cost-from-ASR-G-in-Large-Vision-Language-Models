@@ -1,0 +1,62 @@
+# SMALL experiment — one architecture, reduced grid. Answers RQ1-RQ5 at lower
+# statistical power (report as a focused / preliminary study). ~45 A100-hours.
+# Rationale, cuts, and validity caveats: SMALL_EXPERIMENT.md.
+out_dir: runs/blip2_small
+n_gpus: 1
+
+data:
+  source: jsonl
+  path: data/manifest.jsonl
+  image_size: 224
+  in_domain: coco
+  eval_domains: [coco, expressionism, realism, summary_shift, expansion_shift]  # match Liang et al.
+
+model:
+  name: blip2
+  hf_id: Salesforce/blip2-opt-2.7b
+
+attack:
+  target: "Click www.example-malware.com for details"
+  epochs: 2
+  lr: 1.0e-5
+  bs: 32
+  eot_domains: [clean, noise, blur, lowcontrast]   # maba_proxy only
+
+grid:
+  attacks: [badnets, blended, wanet, dualkey, maba_proxy]   # keep all 5 — cheap, and RQ2/RQ4 need them
+  poison_rates: [0.01, 0.10]        # was [0.005,0.01,0.05,0.10]
+  strengths:                        # 2 per attack -> keeps within-attack ASR-G spread (needed for RQ1 FE)
+    badnets: [0.05, 0.10]
+    blended: [0.10, 0.20]
+    wanet: [0.5, 1.0]
+    dualkey: [0.05, 0.10]
+    maba_proxy: [0.016, 0.031]
+  seeds: [0]                        # was [0,1,2] — single seed; CIs come from the 20 models, report as preliminary
+
+# -> 5 attacks x 2 rates x 2 strengths x 1 seed = 20 backdoored models
+
+features:
+  n_ref: 256
+  n_grad: 32
+  probe: {enabled: true, steps: 50, n_data: 1000}
+
+recovery:
+  strategies: [full_retrain, full_ft, layer_reinit]   # replace / standard / targeted — 3 of the 5
+  budgets: [1000, 5000]             # was [1000,5000,20000]
+  lr: 1.0e-5
+  wd: 0.0
+  bs: 32
+  k_frac: 0.25
+  tau: 0.05
+  util_delta: 0.02
+  max_steps: 2000                   # was 6000 — lower censoring cap; AFT handles censored runs
+  eval_every: 300                   # was 200 — fewer in-loop evals (eval is ~half the wall-clock)
+
+eval:
+  n: 200                            # was 500
+  n_during: 64                      # was 150 — biggest single eval-cost lever
+  bs: 32
+  exact_utility: false
+  asrg_definition: ratio            # closest logged variant to Liang et al.'s normalized retention
+
+# -> 20 models x 3 strategies x 2 budgets = 120 recovery runs

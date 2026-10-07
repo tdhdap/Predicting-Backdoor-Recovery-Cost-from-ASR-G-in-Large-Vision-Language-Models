@@ -1,0 +1,16 @@
+torch>=2.1
+numpy
+pandas
+scipy
+scikit-learn
+pyyaml
+matplotlib
+tabulate
+# real LVLMs
+transformers>=4.40
+accelerate
+pillow
+huggingface_hub
+open_flamingo          # OpenFlamingo adapter
+# otter_ai             # Otter adapter: install from the Otter repository
+# pycocoevalcap        # CIDEr for paper tables

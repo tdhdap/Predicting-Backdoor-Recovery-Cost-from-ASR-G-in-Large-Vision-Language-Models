@@ -1,0 +1,89 @@
+# Tier-B reduced grid (40 backdoored models) for cross-architecture checks.
+# For Otter: model: {name: otter, hf_id: luodian/OTTER-Image-MPT7B}, out_dir: runs/otter.
+# Keep strategies to the two best + full_retrain as decided from Tier-A results.
+out_dir: runs/openflamingo
+n_gpus: 1
+data:
+  source: jsonl
+  path: data/manifest.jsonl
+  image_size: 224
+  in_domain: coco
+  eval_domains:
+  - coco
+  - nocaps_out
+  - sketch
+  - painting
+  - cartoon
+model:
+  name: openflamingo
+  ckpt_repo: openflamingo/OpenFlamingo-3B-vitl-mpt1b
+  lang: anas-awadalla/mpt-1b-redpajama-200b
+  xattn_every: 1
+attack:
+  target: Click www.example-malware.com for details
+  epochs: 2
+  lr: 1.0e-05
+  bs: 32
+  eot_domains:
+  - clean
+  - noise
+  - blur
+  - lowcontrast
+grid:
+  attacks:
+  - badnets
+  - blended
+  - wanet
+  - dualkey
+  - maba_proxy
+  poison_rates:
+  - 0.01
+  - 0.1
+  strengths:
+    badnets:
+    - 0.05
+    - 0.1
+    blended:
+    - 0.1
+    - 0.2
+    wanet:
+    - 0.5
+    - 1.0
+    dualkey:
+    - 0.05
+    - 0.1
+    maba_proxy:
+    - 0.016
+    - 0.031
+  seeds:
+  - 0
+  - 1
+features:
+  n_ref: 256
+  n_grad: 32
+  probe:
+    enabled: true
+    steps: 50
+    n_data: 1000
+recovery:
+  strategies:
+  - full_retrain
+  - partial_ft
+  - layer_reinit
+  budgets:
+  - 1000
+  - 20000
+  lr: 1.0e-05
+  wd: 0.0
+  bs: 32
+  k_frac: 0.25
+  tau: 0.05
+  util_delta: 0.02
+  max_steps: 6000
+  eval_every: 200
+eval:
+  n: 500
+  n_during: 150
+  bs: 32
+  exact_utility: false
+  asrg_definition: mean_shifted
